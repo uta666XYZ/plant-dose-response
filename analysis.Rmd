@@ -1,6 +1,5 @@
 ---
 title: "Dose-response analysis with drc — ED50 comparison"
-author: "Yuta Kobayashi"
 date: "`r format(Sys.Date(), '%Y-%m-%d')`"
 output:
   html_document:
