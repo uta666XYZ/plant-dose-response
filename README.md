@@ -7,9 +7,7 @@ control** response across a range of doses and three stressors
 **`drc::drm()`**; ED50 (= IC50) extraction with delta-method 95 % CIs;
 species-sensitivity comparison.
 
-🌐 **Live report:** https://uta666xyz.github.io/plant-dose-response/
-*(enabled once the repo is made public + GitHub Pages is turned on under
-Settings → Pages → Deploy from branch → `main` / root)*
+[![Live report](https://img.shields.io/badge/Live-report-blue?logo=github)](https://uta666xyz.github.io/plant-dose-response/)
 
 The original measurements are not shareable, so the dataset is
 generated from log-logistic curves with hand-chosen parameters plus
