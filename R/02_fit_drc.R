@@ -49,7 +49,7 @@ grid_one <- function(st) {
 curves <- do.call(rbind, lapply(levels(dat$stressor), grid_one))
 
 # ---- plot 1: dose-response curves ----------------------------------------
-units <- c(NaCl = "(mM)", Cu = "(uM)", Glyphosate = "(uM)")
+units <- c(NaCl = "(mM)", PEG = "(% w/v)", Zn = "(uM)")
 curves$panel <- sprintf("%s %s", curves$stressor, units[as.character(curves$stressor)])
 dat$panel    <- sprintf("%s %s", dat$stressor,    units[as.character(dat$stressor)])
 

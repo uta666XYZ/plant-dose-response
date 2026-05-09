@@ -3,7 +3,7 @@
 Portfolio piece — a synthetic recreation of a dose-response analysis I
 helped run during a colleague's MSc project. Plate-level **% of
 control** response across a range of doses and three stressors
-(NaCl, Cu, glyphosate); four-parameter log-logistic fits with
+(NaCl, PEG-6000, Zn); four-parameter log-logistic fits with
 **`drc::drm()`**; ED50 (= IC50) extraction with delta-method 95 % CIs;
 species-sensitivity comparison.
 
@@ -11,20 +11,23 @@ species-sensitivity comparison.
 
 The original measurements are not shareable, so the dataset is
 generated from log-logistic curves with hand-chosen parameters plus
-Gaussian noise. The qualitative pattern (Cress more sensitive to
-glyphosate, Lettuce more sensitive to Cu) follows what was observed
-on the real plates.
+Gaussian noise. The qualitative pattern — **Tomato more sensitive to
+osmotic stress (NaCl, PEG); Cress more sensitive to heavy-metal
+stress (Zn)** — mirrors a typical Solanaceae-vs-Brassicaceae split
+in seedling phytotoxicity bioassays.
 
 ## What's here
 
 * `R/01_simulate.R` — generates `data/dose_response.{csv,rds}`
-  (2 species × 3 stressors × 7 doses × 6 reps = 252 plants).
+  (2 species × 3 stressors × 3 trials × 7 doses × 2 reps = 252 plants).
 * `R/02_fit_drc.R` — fits `LL.4()` per (species × stressor),
   writes `figures/curves.png`, `figures/ed50_bars.png`, and
   `figures/ED50_table.csv`.
 * `analysis.Rmd` — knit to a self-contained HTML report containing
-  the curve panel, the ED50 table & bar chart, a sanity check against
-  the simulator's ground truth, and pairwise ED50-ratio tests
+  the curve panel with 95 % CI ribbons, **SS1** (LL.4 prediction
+  curves with spline-derived inflection points), **SS2** (trial-to-
+  trial overlay with mean ± SE), the ED50 table & bar chart, a sanity check
+  against the simulator's ground truth, and pairwise ED50-ratio tests
   (`drc::EDcomp`).
 
 ## Reproducing
@@ -41,6 +44,12 @@ rmarkdown::render("analysis.Rmd")    # writes analysis.html
 * **Dose-response curves** — points are individual replicates, lines
   are `LL.4()` fits, ribbons are 95 % confidence bands. X-axis on
   log scale.
+* **SS1 — inflection points** — LL.4 prediction line extended down
+  to the lowest dose; spline-derived d²/dx² zero crossings flagged
+  as vertical grey dashes; the fitted ED50 overlaid in blue.
+* **SS2 — trial comparison** — three trials overlaid per
+  (species × stressor) with mean ± SE error bars and the pooled ED50
+  marked in green.
 * **ED50 bar chart** — ED50 with delta-method 95 % CIs per
   (species × stressor); lower bars mean greater sensitivity.
 * **Truth comparison table** — fitted vs simulator-true ED50 with

@@ -21,10 +21,13 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
 Portfolio piece — a synthetic recreation of a dose-response analysis I
 helped run during a colleague's MSc project. The pipeline takes a
 plate-level "% of control" response across a range of doses and three
-stressors, fits a four-parameter log-logistic curve per
+stressors — **NaCl** (ionic + osmotic), **PEG-6000** (pure osmotic),
+and **Zn** (heavy metal) — measured on **Tomato** and **Cress**
+seedlings, fits a four-parameter log-logistic curve per
 (species × stressor) using **`drc::drm`**, extracts **ED50** (a.k.a.
 IC50) with delta-method 95 % CIs, and compares species sensitivity
-across stressors.
+across stressors. The three-stressor design separates ionic vs purely
+osmotic vs heavy-metal mechanisms.
 
 ## Simulated data
 
@@ -55,6 +58,123 @@ knitr::include_graphics("figures/curves.png")
 
 Points are individual replicates; lines are predictions from
 `LL.4()`; ribbons are 95 % confidence bands.
+
+## SS1 — Dose-response curves with inflection points
+
+A flexible smoothing spline is fit through the replicate means on
+log-dose, and zero crossings of its second derivative are flagged as
+**inflection points**. The fitted **ED50** (from the LL.4 fit) is
+overlaid as a blue dashed line; spline-derived inflection points are
+black dashed.
+
+```{r ss1-inflection, fig.height = 7}
+library(ggplot2); library(dplyr)
+
+inflect_points <- function(x, y, n_grid = 400) {
+  ord <- order(x); x <- x[ord]; y <- y[ord]
+  fit  <- smooth.spline(x, y, spar = 0.55)
+  xs   <- seq(min(x), max(x), length.out = n_grid)
+  d2   <- predict(fit, xs, deriv = 2)$y
+  zc   <- which(diff(sign(d2)) != 0)
+  # drop boundary artefacts near the edges of the sampled range
+  margin <- 0.08 * (max(x) - min(x))
+  xs_zc  <- xs[zc]
+  xs_zc[xs_zc > min(x) + margin & xs_zc < max(x) - margin]
+}
+
+ss1 <- dat %>%
+  group_by(species, stressor, dose) %>%
+  summarise(mean_resp = mean(response), .groups = "drop") %>%
+  mutate(log_dose = log10(pmax(dose, 1)))
+
+inflect_df <- ss1 %>%
+  group_by(species, stressor) %>%
+  summarise(infl = list(10 ^ inflect_points(log_dose, mean_resp)),
+            .groups = "drop") %>%
+  tidyr::unnest(infl)
+
+ed50_lines <- ed50 %>%
+  transmute(species, stressor, ed50 = ED50)
+
+# Prediction line on a fine grid extending down to x = 1 so the curve
+# is visible across the full log-dose axis (not just the sampled doses).
+ss1_pred <- do.call(rbind, lapply(levels(dat$stressor), function(st) {
+  m  <- fits[[st]]
+  xr <- range(dat$dose[dat$stressor == st & dat$dose > 0])
+  xs <- exp(seq(log(1), log(xr[2]), length.out = 250))
+  pr <- predict(m, newdata = expand.grid(dose = xs,
+                                          species = levels(dat$species)))
+  out <- expand.grid(dose = xs, species = levels(dat$species))
+  out$mean_resp <- as.numeric(pr)
+  out$stressor  <- st
+  out
+}))
+ss1_pred$species  <- factor(ss1_pred$species,  levels = levels(dat$species))
+ss1_pred$stressor <- factor(ss1_pred$stressor, levels = levels(dat$stressor))
+
+ggplot(dat[dat$dose > 0, ], aes(dose, response)) +
+  geom_point(alpha = 0.5, size = 1.3) +
+  geom_line(data = ss1_pred, aes(dose, mean_resp),
+            colour = "black", linewidth = 0.6) +
+  geom_vline(data = inflect_df, aes(xintercept = infl),
+             linetype = "dashed", colour = "grey20", linewidth = 0.4) +
+  geom_vline(data = ed50_lines, aes(xintercept = ed50),
+             linetype = "dashed", colour = "blue", linewidth = 0.6) +
+  facet_grid(species ~ stressor, scales = "free_x") +
+  scale_x_log10() +
+  labs(x = "Dose (log scale)",
+       y = "Response (% of control)",
+       title = "Dose-response curves with inflection points (SS1)",
+       subtitle = "Blue = fitted ED50; grey = spline d2/dx2 zero crossings") +
+  theme_minimal(base_size = 11)
+
+ggsave("figures/ss1_inflection.png", width = 9, height = 6, dpi = 150)
+```
+
+## SS2 — Trial-to-trial comparison
+
+Three independent trials of the same experiment, overlaid per
+(species × stressor). Points are trial means, error bars are ± SE
+across replicates; the vertical green line marks the pooled ED50.
+
+```{r ss2-trials, fig.height = 7}
+ss2 <- dat %>%
+  group_by(species, stressor, trial, dose) %>%
+  summarise(mean_resp = mean(response),
+            se_resp   = sd(response) / sqrt(n()),
+            .groups   = "drop") %>%
+  filter(dose > 0)
+
+ggplot(ss2, aes(dose, mean_resp,
+                colour   = trial,
+                linetype = trial,
+                shape    = trial)) +
+  geom_errorbar(aes(ymin = mean_resp - se_resp,
+                    ymax = mean_resp + se_resp),
+                width = 0.05, linewidth = 0.5) +
+  geom_line(linewidth = 0.7) +
+  geom_point(size = 2.2) +
+  geom_vline(data = ed50_lines, aes(xintercept = ed50),
+             colour = "darkgreen", linewidth = 0.6, inherit.aes = FALSE) +
+  facet_grid(species ~ stressor, scales = "free_x") +
+  scale_x_log10() +
+  scale_colour_manual(values = c(`1` = "#1F78B4",
+                                 `2` = "#1F78B4",
+                                 `3` = "#E41A1C")) +
+  scale_linetype_manual(values = c(`1` = "dotted",
+                                   `2` = "dashed",
+                                   `3` = "solid")) +
+  scale_shape_manual(values = c(`1` = 16, `2` = 17, `3` = 15)) +
+  labs(x = "Dose (log scale)",
+       y = "Response (% of control)",
+       title = "Trial-to-trial comparison (SS2)",
+       subtitle = "Mean +/- SE per trial; green line = pooled ED50",
+       colour = "Trial", linetype = "Trial", shape = "Trial") +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "top")
+
+ggsave("figures/ss2_trials.png", width = 9, height = 6, dpi = 150)
+```
 
 ## ED50 comparison
 
